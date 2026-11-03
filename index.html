@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIAO ENERGY — 3D</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:#06080c;font-family:Arial,Helvetica,sans-serif;color:#fff;overflow-x:hidden}
+  #space{height:1000vh} /* hero + 3 главы + финал */
+  canvas#gl{position:fixed;inset:0;z-index:0;display:block}
+  #vignette{position:fixed;inset:0;z-index:5;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%, transparent 52%, rgba(0,0,0,.55) 100%)}
+  header{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;
+    justify-content:space-between;padding:18px 26px;pointer-events:none}
+  .burger{display:flex;flex-direction:column;gap:5px}
+  .burger i{display:block;width:22px;height:2px;background:#fff;opacity:.85}
+  .burger i:last-child{width:14px}
+  #logo{position:absolute;left:50%;transform:translateX(-50%) skew(-10deg);
+    font:900 20px/1 "Arial Black",Arial,sans-serif;letter-spacing:1px;font-style:italic;
+    text-shadow:0 2px 12px rgba(0,0,0,.5)}
+  #logo small{display:block;font-size:9px;letter-spacing:4px;font-style:italic;opacity:.9}
+  #menuPill{pointer-events:auto;background:#fff;color:#000;border-radius:999px;padding:9px 20px;
+    font:800 11px Arial;letter-spacing:2px;cursor:pointer}
+  #progress{position:fixed;top:0;left:0;height:3px;width:0;background:#fff;z-index:30}
+  #plate{position:fixed;bottom:6vh;left:50%;transform:translateX(-50%);text-align:center;z-index:10;pointer-events:none}
+  #plateName{font:900 26px "Arial Black",Arial;letter-spacing:6px;text-transform:uppercase;
+    text-shadow:0 4px 18px rgba(0,0,0,.6)}
+  #plateSub{margin-top:6px;font:700 11px Arial;letter-spacing:5px;opacity:.75}
+  .flip{animation:flipIn .5s cubic-bezier(.2,.9,.2,1)}
+  @keyframes flipIn{0%{transform:rotateX(90deg);opacity:0}100%{transform:none;opacity:1}}
+  .nav{position:fixed;top:50%;transform:translateY(-50%);z-index:15;background:none;border:0;
+    color:#fff;font:300 44px Arial;opacity:.75;cursor:pointer;padding:10px 16px;transition:.2s}
+  .nav:hover{opacity:1;transform:translateY(-50%) scale(1.2)}
+  #prev{left:5vw}#next{right:5vw}
+  #hint{position:fixed;bottom:3vh;right:4vw;z-index:10;font:700 10px Arial;letter-spacing:3px;opacity:.6}
+  .panel{position:fixed;left:8vw;top:50%;transform:translateY(-50%);max-width:340px;z-index:10;
+    opacity:0;pointer-events:none}
+  .tag{width:64px;height:10px;background:#fff;margin-bottom:16px}
+  .panel h2{font:900 40px/1.02 "Arial Black",Arial;text-transform:uppercase;letter-spacing:1px;
+    text-shadow:0 4px 20px rgba(0,0,0,.35)}
+  .panel p{margin-top:14px;font:400 13px/1.6 Arial;opacity:.92}
+  .bar{margin-top:16px;width:230px;height:14px;background:rgba(255,255,255,.35)}
+  .bar i{display:block;height:100%;width:0;background:#fff;transition:width .1s linear}
+  .barLabel{margin-top:6px;font:900 12px Arial;letter-spacing:2px}
+  #cta{position:fixed;inset:0;z-index:18;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:20px;opacity:0;pointer-events:none;text-align:center}
+  #cta h1{font:900 44px "Arial Black",Arial;font-style:italic;transform:skew(-8deg)}
+  #cta button{background:#fff;color:#000;border:0;border-radius:999px;padding:16px 38px;
+    font:900 13px Arial;letter-spacing:3px;cursor:pointer}
+  #cta button:hover{transform:scale(1.06)}
+</style>
+</head>
+<body>
+<div id="space"></div>
+<canvas id="gl"></canvas>
+<div id="vignette"></div>
+<div id="progress"></div>
+
+<header>
+  <div class="burger"><i></i><i></i><i></i></div>
+  <div id="logo">CIAO<small>ENERGY</small></div>
+  <div id="menuPill">MENU</div>
+</header>
+
+<div id="plate"><div id="plateName">CITRON VERT</div><div id="plateSub">ORIGINAL — ENERGY DRINK</div></div>
+<button class="nav" id="prev">‹</button>
+<button class="nav" id="next">›</button>
+<div id="hint">SCROLL ↓</div>
+
+<div class="panel" id="p1">
+  <div class="tag"></div><h2 id="p1t"></h2><p id="p1d"></p>
+</div>
+<div class="panel" id="p2">
+  <div class="tag"></div><h2 id="p2t"></h2>
+  <div class="bar"><i id="barFill"></i></div><div class="barLabel" id="barLbl"></div>
+  <p id="p2d"></p>
+</div>
+
+<div id="cta">
+  <h1>CIAO ENERGY</h1>
+  <button onclick="scrollTo({top:0,behavior:'smooth'})">REVOIR LES SAVEURS</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   ★ 1. ФОТО НА БАНКАХ (папка image рядом с index.html) ★
+============================================================ */
+const CAN_PHOTOS = [
+  './image/photo1.jpg',   // Банка 1
+  './image/photo2.jpg',   // Банка 2
+  './image/photo3.jpg'    // Банка 3
+];
+
+/* ============================================================
+   ★ 2. ТЕКСТ НА ЭТИКЕТКЕ КАЖДОЙ БАНКИ (поверх фото) ★
+============================================================ */
+const CAN_LABELS = [
+  { main:'',    sub:'  ', tag:'',  color:'#ffffff', accent:'#39e6ff' },
+  { main:'',   sub:'  ',     tag:'',  color:'#ffffff', accent:'#ff3548' },
+  { main:'', sub:'',            tag:'', color:'#ffffff', accent:'#ff2bd6' }
+];
+
+/* ============================================================
+   ★ 3. ТЕКСТЫ ГЛАВЫ СКРОЛЛА ДЛЯ КАЖДОЙ БАНКИ ★
+   Глава = банка: панель 1 → панель 2 → слоган → след. банка
+============================================================ */
+const SCROLL_TEXTS = [
+  {
+    panelTitle:  'СВЕЖЕСТЬ КИБЕРШОКА',
+    panelDesc:   'Ты также прекрасна как и в столовой чай с пиццой',
+    panel2Title: 'СУШНЯЧЕК',
+    panel2Desc:  'Каждый день ты видишь её в школе, но не подходишь',
+    barLabel:    '-100 К СУШНЯКУ',
+    slogan:      'ПИЦЦА ВАСЬ'
+  },
+  {
+    panelTitle:  'СВЕЖЕСТЬ ЛИФЧИКА',
+    panelDesc:   'Также прекрасна как и дуэт наших родителей',
+    panel2Title: '',
+    panel2Desc:  'Так же бодра как и твой стояк',
+    barLabel:    'ОНА ТЕБЯ МОГГНЕТ',
+    slogan:      'МОГГ МОГГ МОГГ'
+  },
+  {
+    panelTitle:  'СВЕЖЕСТЬ ЛЯШЕК',
+    panelDesc:   'Ты также вкусна как и твои ляшки,также свежо и бодро',
+    panel2Title: '+200 К СУШНЯКУ САВЫ',
+    panel2Desc:  'Тоже самое, что и снится тебе каждый день',
+    barLabel:    '+40% САХАРА',
+    slogan:      'СУШНЯК ВАСЬ'
+  }
+];
+
+/* 4. вкусы: табличка, цвета фона/акцента */
+const flavors=[
+ {name:'CITRON VERT',sub:'ORIGINAL — ENERGY DRINK',c1:'#062a44',c2:'#0d86c8',accent:'#39e6ff',bg:'#0b7fa5'},
+ {name:'CERISE NOIRE',sub:'COLA — ENERGY DRINK',c1:'#40060f',c2:'#c81430',accent:'#ff3548',bg:'#b01024'},
+ {name:'POMME RHUBARBE',sub:'ÉDITION ROSE — ENERGY DRINK',c1:'#6d0a86',c2:'#d21fb8',accent:'#ff2bd6',bg:'#b70fbf'}
+];
+const N=flavors.length;
+let userIndex=0;      // выбор в hero (стрелки/клик)
+const HERO_END=0.10;  // конец hero, начало глав
+const CTA_LEN=0.07;   // финал
+const CH_LEN=(1-HERO_END-CTA_LEN)/N; // длина одной главы
+
+/* ================= РЕНДЕРЕР / СЦЕНА ================= */
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('gl'),antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+
+const scene=new THREE.Scene();
+const curBg=new THREE.Color('#06080c');
+scene.background=curBg;
+scene.fog=new THREE.Fog(curBg.clone(),9,20);
+
+const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.1,100);
+camera.position.set(0,1.55,6.4);
+
+(function(){
+  const c=document.createElement('canvas');c.width=1024;c.height=512;const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,512);
+  g.addColorStop(0,'#04060a');g.addColorStop(.45,'#141a22');g.addColorStop(.55,'#0d1218');g.addColorStop(1,'#020304');
+  x.fillStyle=g;x.fillRect(0,0,1024,512);
+  const sp=(cx,cy,r,a)=>{const rg=x.createRadialGradient(cx,cy,0,cx,cy,r);
+    rg.addColorStop(0,'rgba(255,255,255,'+a+')');rg.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=rg;x.fillRect(cx-r,cy-r,r*2,r*2);};
+  sp(180,140,110,1);sp(520,110,150,.95);sp(850,150,90,.9);sp(520,330,300,.25);
+  const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;
+  const pm=new THREE.PMREMGenerator(renderer);pm.compileEquirectangularShader();
+  scene.environment=pm.fromEquirectangular(t).texture;
+})();
+
+const amb=new THREE.AmbientLight(0xffffff,.28);scene.add(amb);
+const spot=new THREE.SpotLight(0xffffff,2.4,25,.55,.65);spot.position.set(0,4.4,1.4);scene.add(spot);
+const spotTarget=new THREE.Object3D();spotTarget.position.set(0,1.1,0);scene.add(spotTarget);spot.target=spotTarget;
+const d1=new THREE.DirectionalLight(0xbfd8ff,.55);d1.position.set(5,3,-4);scene.add(d1);
+const d2=new THREE.DirectionalLight(0xffffff,.35);d2.position.set(-5,2,-3);scene.add(d2);
+
+const floor=new THREE.Mesh(new THREE.CircleGeometry(40,64),
+  new THREE.MeshStandardMaterial({color:0x0a0d12,metalness:.65,roughness:.35,transparent:true}));
+floor.rotation.x=-Math.PI/2;scene.add(floor);
+
+function radial(inner,outer){
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  const g=x.createRadialGradient(128,128,0,128,128,128);
+  g.addColorStop(0,inner);g.addColorStop(1,outer);x.fillStyle=g;x.fillRect(0,0,256,256);
+  return new THREE.CanvasTexture(c);
+}
+const shadowTex=radial('rgba(0,0,0,.75)','rgba(0,0,0,0)');
+const poolTex=radial('rgba(255,255,255,.9)','rgba(255,255,255,0)');
+
+const pool=new THREE.Mesh(new THREE.PlaneGeometry(6,6),
+  new THREE.MeshBasicMaterial({map:poolTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+pool.rotation.x=-Math.PI/2;pool.position.y=.02;scene.add(pool);
+
+const lamp=new THREE.Group();
+const lampBody=new THREE.Mesh(new THREE.CylinderGeometry(.85,.95,.22,48),
+  new THREE.MeshStandardMaterial({color:0x111318,metalness:.9,roughness:.35}));
+const lampGlow=new THREE.Mesh(new THREE.CircleGeometry(.8,48),
+  new THREE.MeshBasicMaterial({color:0xffffff}));
+lampGlow.rotation.x=Math.PI/2;lampGlow.position.y=-.12;
+const lampRing=new THREE.Mesh(new THREE.TorusGeometry(.95,.05,12,48),
+  new THREE.MeshStandardMaterial({color:0xd8dce0,metalness:1,roughness:.25}));
+lampRing.rotation.x=Math.PI/2;lampRing.position.y=-.1;
+lamp.add(lampBody,lampGlow,lampRing);lamp.position.y=3.55;scene.add(lamp);
+
+/* ================= ЭТИКЕТКА: ТЕКСТ ================= */
+function drawLabel(ctx,w,h,label){
+  const S=w/1024;
+  let sg=ctx.createLinearGradient(0,0,0,64*S);sg.addColorStop(0,'#e0e2e5');sg.addColorStop(1,'#8f979e');
+  ctx.fillStyle=sg;ctx.fillRect(0,0,w,64*S);
+  sg=ctx.createLinearGradient(0,h-64*S,0,h);sg.addColorStop(0,'#8f979e');sg.addColorStop(1,'#d9dde1');
+  ctx.fillStyle=sg;ctx.fillRect(0,h-64*S,w,64*S);
+  ctx.fillStyle=label.accent||'#ffffff';
+  ctx.fillRect(0,h-120*S,w,16*S);
+  ctx.fillStyle='rgba(255,255,255,.85)';
+  ctx.fillRect(0,h-98*S,w,4*S);
+  if(label.tag){
+    ctx.fillStyle=label.color||'#fff';
+    ctx.font='700 '+(42*S)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,.7)';ctx.shadowBlur=14*S;ctx.shadowOffsetY=4*S;
+    ctx.fillText(label.tag,w/2,34*S);
+    ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+  }
+  if(label.main){
+    ctx.save();ctx.translate(w/2-60*S,h/2);ctx.rotate(-Math.PI/2);
+    ctx.font='900 '+(220*S)+'px "Arial Black",Arial,sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(0,0,0,.6)';ctx.shadowBlur=30*S;ctx.shadowOffsetY=8*S;
+    ctx.fillStyle=label.color||'#fff';
+    ctx.fillText(label.main,0,0);ctx.restore();
+  }
+  if(label.sub){
+    ctx.save();ctx.translate(w/2+60*S,h/2);ctx.rotate(-Math.PI/2);
+    ctx.font='700 '+(48*S)+'px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='rgba(255,255,255,.92)';
+    ctx.fillText(label.sub,0,0);ctx.restore();
+  }
+  ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+}
+function makeFallbackLabel(f,label){
+  const c=document.createElement('canvas');c.width=c.height=1024;const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,1024);
+  g.addColorStop(0,f.c1);g.addColorStop(.5,f.c2);g.addColorStop(1,f.c1);
+  x.fillStyle=g;x.fillRect(0,0,1024,1024);
+  drawLabel(x,1024,1024,label);
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;
+  t.wrapS=THREE.RepeatWrapping;t.anisotropy=8;return t;
+}
+
+/* ================= БАНКА ================= */
+const alu=()=>new THREE.MeshStandardMaterial({color:0xcfd4d8,metalness:1,roughness:.26,envMapIntensity:1.25});
+function makeCan(f,label){
+  const gr=new THREE.Group();
+  const R=.46,y0=.18,y1=2.02;
+  const mat=new THREE.MeshPhysicalMaterial({
+    map:makeFallbackLabel(f,label),
+    metalness:.4,roughness:.42,clearcoat:.6,clearcoatRoughness:.2,envMapIntensity:.8
+  });
+  const body=new THREE.Mesh(
+    new THREE.CylinderGeometry(R,R,y1-y0,64,1,true,-Math.PI,Math.PI*2),mat);
+  body.position.y=(y0+y1)/2;
+  const bp=[[0,.02],[.2,.02],[.34,.05],[.42,.1],[.455,.15],[R,y0]].map(p=>new THREE.Vector2(p[0],p[1]));
+  const bottom=new THREE.Mesh(new THREE.LatheGeometry(bp,64),alu());
+  const tp=[[R,y1],[.455,2.06],[.43,2.13],[.395,2.185],[.4,2.215],[.435,2.245],
+    [.44,2.265],[.415,2.275],[.375,2.26],[.35,2.235],[.335,2.22]].map(p=>new THREE.Vector2(p[0],p[1]));
+  const top=new THREE.Mesh(new THREE.LatheGeometry(tp,64),alu());
+  const lid=new THREE.Mesh(new THREE.CircleGeometry(.345,48),alu());
+  lid.rotation.x=-Math.PI/2;lid.position.y=2.225;
+  const tab=new THREE.Mesh(new THREE.BoxGeometry(.07,.012,.2),alu());
+  tab.position.set(0,2.238,.03);
+  const tabRing=new THREE.Mesh(new THREE.TorusGeometry(.055,.014,10,24),alu());
+  tabRing.rotation.x=Math.PI/2;tabRing.position.set(0,2.238,-.08);
+  gr.add(body,bottom,top,lid,tab,tabRing);
+  return {gr,mat};
+}
+const cans=[];
+flavors.forEach((f,i)=>{
+  const label=Object.assign({main:'',sub:'',tag:'',color:'#fff',accent:f.accent},CAN_LABELS[i]||{});
+  const {gr,mat}=makeCan(f,label);
+  gr.userData.ci=i;scene.add(gr);
+  const sh=new THREE.Mesh(new THREE.PlaneGeometry(1.7,1.7),
+    new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false}));
+  sh.rotation.x=-Math.PI/2;sh.position.y=.012;scene.add(sh);
+  cans.push({g:gr,sh,phase:i*1.7,mat,label});
+});
+
+/* ================= ФОТО + ТЕКСТ → ТЕКСТУРА ================= */
+function applyPhoto(tex,i){
+  const c=cans[i],label=c.label;
+  const W=2048,H=2048;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const ctx=cv.getContext('2d');
+  const iw=tex.image.naturalWidth||tex.image.width;
+  const ih=tex.image.naturalHeight||tex.image.height;
+  const sc=Math.max(W/iw,H/ih);
+  ctx.drawImage(tex.image,(W-iw*sc)/2,(H-ih*sc)/2,iw*sc,ih*sc);
+  ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(0,0,W,H);
+  drawLabel(ctx,W,H,label);
+  const nt=new THREE.CanvasTexture(cv);
+  nt.encoding=THREE.sRGBEncoding;
+  nt.wrapS=THREE.RepeatWrapping;nt.wrapT=THREE.ClampToEdgeWrapping;nt.anisotropy=8;
+  c.mat.map=nt;c.mat.metalness=.35;c.mat.roughness=.45;c.mat.envMapIntensity=.7;
+  c.mat.needsUpdate=true;
+}
+CAN_PHOTOS.forEach((url,i)=>{
+  if(!url)return;
+  new THREE.TextureLoader().load(url,t=>applyPhoto(t,i),undefined,
+    ()=>console.warn('Банка '+(i+1)+': фото не загрузилось → '+url));
+});
+
+/* ================= ГЛОУ + СЛОГАН ================= */
+const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:poolTex,transparent:true,
+  blending:THREE.AdditiveBlending,depthWrite:false,opacity:0}));
+glow.scale.set(8,8,1);glow.position.set(.6,1.3,-1.6);scene.add(glow);
+
+function makeSloganTexture(text){
+  const c=document.createElement('canvas');c.width=2048;c.height=600;
+  const x=c.getContext('2d');
+  x.clearRect(0,0,2048,600);
+  x.font='900 250px "Arial Black",Arial,sans-serif';x.textAlign='center';x.textBaseline='middle';
+  x.save();x.translate(1024,300);x.transform(1,0,-.18,1,0,0);
+  x.shadowColor='rgba(0,0,0,.35)';x.shadowBlur=30;x.fillStyle='#fff';
+  x.fillText(text,0,0);x.restore();
+  const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;
+}
+const slogan=new THREE.Mesh(new THREE.PlaneGeometry(11,3.2),
+  new THREE.MeshBasicMaterial({map:makeSloganTexture(' '),transparent:true,opacity:0,depthWrite:false}));
+slogan.position.set(.6,1.35,-3.1);scene.add(slogan);
+
+const pGeo=new THREE.BufferGeometry();const pN=140;const pos=new Float32Array(pN*3);
+for(let i=0;i<pN;i++){pos[i*3]=(Math.random()-.5)*14;pos[i*3+1]=Math.random()*5;pos[i*3+2]=(Math.random()-.5)*10-2;}
+pGeo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+const parts=new THREE.Points(pGeo,new THREE.PointsMaterial({color:0xffffff,size:.02,
+  transparent:true,opacity:.5,depthWrite:false}));
+scene.add(parts);
+
+/* ================= UI ================= */
+const $=id=>document.getElementById(id);
+const plateName=$('plateName'),plateSub=$('plateSub'),p1=$('p1'),p2=$('p2'),
+      p1t=$('p1t'),p1d=$('p1d'),p2t=$('p2t'),p2d=$('p2d'),
+      barFill=$('barFill'),barLbl=$('barLbl'),cta=$('cta'),hint=$('hint'),
+      prog=$('progress'),plate=$('plate'),prevB=$('prev'),nextB=$('next');
+const accCur=new THREE.Color(flavors[0].accent);
+
+/* тексты главы под активную банку */
+let lastTextsCan=-1;
+function applyTexts(i){
+  const st=SCROLL_TEXTS[i]||SCROLL_TEXTS[0];
+  p1t.textContent=st.panelTitle;  p1d.textContent=st.panelDesc;
+  p2t.textContent=st.panel2Title; p2d.textContent=st.panel2Desc;
+  barLbl.textContent=st.barLabel;
+  slogan.material.map.dispose();
+  slogan.material.map=makeSloganTexture(st.slogan);
+  slogan.material.needsUpdate=true;
+}
+/* табличка hero */
+function setPlate(i){
+  const f=flavors[i];
+  plateName.textContent=f.name;plateSub.textContent=f.sub;
+  [plateName,plateSub].forEach(el=>{el.classList.remove('flip');void el.offsetWidth;el.classList.add('flip');});
+}
+setPlate(0);
+
+/* стрелки: в hero — выбор банки, в главах — прыжок на главу */
+const scrollable=()=>Math.max(1,document.body.scrollHeight-innerHeight);
+const scrollP=()=>scrollY/scrollable();
+function chapterAt(p){
+  if(p<HERO_END)return {mode:'hero',k:0,q:0};
+  const x=p-HERO_END;
+  const k=Math.min(N-1,Math.floor(x/CH_LEN));
+  return {mode:'ch',k,q:THREE.MathUtils.clamp((x-k*CH_LEN)/CH_LEN,0,1)};
+}
+function go(dir){
+  const p=scrollP();
+  if(p<HERO_END){
+    userIndex=((userIndex+dir)%N+N)%N;setPlate(userIndex);
+  }else{
+    const {k}=chapterAt(p);
+    const k2=THREE.MathUtils.clamp(k+dir,0,N-1);
+    scrollTo({top:(HERO_END+k2*CH_LEN+0.002)*scrollable(),behavior:'smooth'});
+  }
+}
+prevB.onclick=()=>go(-1);
+nextB.onclick=()=>go(1);
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft')go(-1);
+  if(e.key==='ArrowRight')go(1);
+});
+
+/* свайп + клик по банке (только в hero) */
+const ray=new THREE.Raycaster(),pv=new THREE.Vector2();
+let dx0=null,dy0=null;
+addEventListener('pointerdown',e=>{dx0=e.clientX;dy0=e.clientY;});
+addEventListener('pointerup',e=>{
+  if(dx0===null)return;
+  const dx=e.clientX-dx0,dy=e.clientY-dy0;
+  if(scrollP()<HERO_END){
+    if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.4){
+      userIndex=((userIndex+(dx<0?1:-1))%N+N)%N;setPlate(userIndex);
+    }else if(Math.abs(dx)<6&&Math.abs(dy)<6&&e.target===renderer.domElement){
+      pv.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);
+      ray.setFromCamera(pv,camera);
+      const hits=ray.intersectObjects(cans.map(c=>c.g),true);
+      if(hits.length){let o=hits[0].object;
+        while(o&&o.userData.ci===undefined)o=o.parent;
+        if(o){userIndex=o.userData.ci;setPlate(userIndex);}}
+    }
+  }
+  dx0=null;
+});
+let mx=0,my=0;
+addEventListener('mousemove',e=>{mx=e.clientX/innerWidth*2-1;my=e.clientY/innerHeight*2-1;});
+
+const ss=(a,b,x)=>{x=THREE.MathUtils.clamp((x-a)/(b-a),0,1);return x*x*(3-2*x);};
+const trap=(x,a,b,c,d)=>ss(a,b,x)*(1-ss(c,d,x));
+const wrapD=d=>{d=((d%N)+N)%N;if(d>N/2)d-=N;return d;};
+
+/* ================= ЦИКЛ ================= */
+const clock=new THREE.Clock();
+let idleAccum=0;
+const camHero=new THREE.Vector3(0,1.55,6.4),camDet=new THREE.Vector3(.55,1.35,5.0);
+const lookHero=new THREE.Vector3(0,1.25,0),lookDet=new THREE.Vector3(.6,1.2,0);
+const tmpV=new THREE.Vector3(),tmpC=new THREE.Color(),lookCur=lookHero.clone();
+
+function tick(){
+  requestAnimationFrame(tick);
+  const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+  const p=scrollP();
+  const ch=chapterAt(p);
+  const inCh=ch.mode==='ch';
+  const activeCan=inCh?(userIndex+ch.k)%N:userIndex;
+  const q=ch.q;
+
+  /* тексты меняются вместе с активной банкой */
+  if(activeCan!==lastTextsCan){applyTexts(activeCan);lastTextsCan=activeCan;}
+
+  const detail=ss(HERO_END-0.02,HERO_END+0.08,p);
+  const f=flavors[activeCan];
+
+  tmpC.set(f.bg);curBg.lerp(tmpC.clone().lerp(new THREE.Color('#06080c'),1-detail),.08);
+  scene.background=curBg;scene.fog.color.copy(curBg);
+  amb.color.copy(curBg);amb.intensity=.28+detail*.55;
+  accCur.lerp(new THREE.Color(f.accent),.08);
+  pool.material.color.copy(accCur);
+  glow.material.color.copy(accCur);
+
+  /* вращение: idle + 2 оборота на главу, непрерывно сквозь главы */
+  idleAccum+=dt*.25;
+  const spin=idleAccum+(inCh?(ch.k+q):0)*Math.PI*4;
+
+  /* боковые банки видны на поворотах, скрыты в середине главы */
+  const hideSides=detail*(inCh?trap(q,.10,.18,.82,.90):0);
+
+  cans.forEach((c,i)=>{
+    const d=wrapD(i-activeCan);
+    const center=d===0;
+    const spread=1+detail*1.6;
+    const tx=d*1.6*spread, tz=-Math.abs(d)*.9+(center?.4:0);
+    const ty=.32+(center?.12:0)+Math.sin(t*1.6+c.phase)*.05;
+    c.g.position.lerp(tmpV.set(tx,ty,tz),.12);
+    const s=center?1:Math.max(.0001,.94*(1-hideSides));
+    c.g.scale.setScalar(THREE.MathUtils.lerp(c.g.scale.x,s,.15));
+    const rotTarget=center?spin:-d*.35;
+    c.g.rotation.y=THREE.MathUtils.lerp(c.g.rotation.y,rotTarget,Math.min(1,dt*8));
+    c.g.rotation.z=THREE.MathUtils.lerp(c.g.rotation.z,d*.05+detail*.1,.1);
+    c.sh.position.x=c.g.position.x;c.sh.position.z=c.g.position.z;
+    c.sh.material.opacity=(1-detail)*.55*(center?1:.7*(1-hideSides));
+  });
+
+  lamp.position.y=3.55+detail*3+Math.sin(t*1.2)*.04;
+  spot.intensity=2.4*(1-detail*.75);
+  floor.material.opacity=1-detail*.92;
+  pool.material.opacity=(1-detail)*.75;
+  glow.material.opacity=detail*.55;
+
+  /* окна глав: панель1 → панель2 → слоган */
+  const o1=inCh?trap(q,.14,.20,.34,.40):0;
+  const o2=inCh?trap(q,.40,.46,.60,.66):0;
+  const sOp=inCh?trap(q,.66,.74,.90,.98):0;
+  slogan.material.opacity=sOp*.95;
+  slogan.scale.setScalar(.8+.25*sOp);
+  parts.rotation.y=t*.02;parts.position.y=(t*.05)%1;
+
+  tmpV.copy(camHero).lerp(camDet,detail);
+  camera.position.set(tmpV.x+mx*.35*(1-detail),tmpV.y-my*.2*(1-detail),tmpV.z);
+  lookCur.lerp(tmpV.copy(lookHero).lerp(lookDet,detail),.1);
+  camera.lookAt(lookCur);
+
+  prog.style.width=(p*100)+'%';
+  const heroOp=1-ss(HERO_END-.06,HERO_END-.005,p);
+  [plate,prevB,nextB,hint].forEach(el=>el.style.opacity=heroOp*(el===hint?.6:.9));
+  prevB.style.pointerEvents=nextB.style.pointerEvents=heroOp<.3?'none':'auto';
+  p1.style.opacity=o1;p1.style.transform='translateY(-50%) translateX('+((1-o1)*-40)+'px)';
+  p2.style.opacity=o2;p2.style.transform='translateY(-50%) translateX('+((1-o2)*-40)+'px)';
+  barFill.style.width=(o2*68)+'%';
+  const cOp=ss(1-CTA_LEN+0.03,1-0.005,p);
+  cta.style.opacity=cOp;cta.style.pointerEvents=cOp>.5?'auto':'none';
+
+  renderer.render(scene,camera);
+}
+tick();
+
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
